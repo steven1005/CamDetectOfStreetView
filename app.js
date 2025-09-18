@@ -1,13 +1,7 @@
 document.addEventListener('DOMContentLoaded', function () {
     // ============================ 請在這裡設定您的 Token ============================
-
-    // 1. 請將您從 Mapillary 官網複製的「完整」Token 貼在此處
-    //    (它應該是 `MLY|...|...` 的格式)
-    const MAPILLARY_FULL_TOKEN = 'MLY|25053230184274584|6f54c235cc9a903f16230177f9acc623'; // 請替換
-
-    // 2. 請將上面 Token 的「最後一長串亂碼」單獨複製貼在此處
-    const MAPILLARY_SHORT_TOKEN = '6f54c235cc9a903f16230177f9acc623'; // 請替換
-
+    const MAPILLARY_FULL_TOKEN = 'MLY|25053230184274584|6f54c235cc9a903f16230177f9acc623';
+    const MAPILLARY_SHORT_TOKEN = '6f54c235cc9a903f16230177f9acc623';
     // ==============================================================================
 
     const curated_routes = [
@@ -45,6 +39,15 @@ document.addEventListener('DOMContentLoaded', function () {
     let rideInterval = null;
     let isRiding = false;
 
+    function startSimulatorFromCoords(lat, lng) {
+        const popup = L.popup().setLatLng([lat, lng]).setContent('正在為您載入路線...').openOn(map);
+        const url = `https://graph.mapillary.com/images?access_token=${MAPILLARY_SHORT_TOKEN}&fields=id&closeto=${lng},${lat}&radius=3000`;
+        fetch(url).then(r => r.json()).then(d => {
+            if (d && d.data && d.data.length > 0) { popup.remove(); startSimulator(d.data[0].id); }
+            else { popup.setContent('此座標附近沒有可用的街景照片。'); }
+        }).catch(err => popup.setContent('載入路線時發生錯誤。'));
+    }
+
     function initMap() {
         map = L.map('map', { zoomControl: false }).setView([23.9, 121.1], 5);
         L.control.zoom({ position: 'topright' }).addTo(map);
@@ -62,6 +65,10 @@ document.addEventListener('DOMContentLoaded', function () {
         };
         const glLayer = L.mapboxGL({ style: mapillaryStyle }).addTo(map);
         const mapboxMap = glLayer.getMapboxMap();
+
+        // *** 修正渲染 Bug 的程式碼 ***
+        map.on('zoomend', () => { setTimeout(() => { mapboxMap.resize(); }, 10); });
+        map.on('moveend', () => { setTimeout(() => { mapboxMap.resize(); }, 10); });
 
         mapboxMap.on('load', () => {
             const layers = ['mapillary-sequences', 'mapillary-images'];
@@ -107,25 +114,9 @@ document.addEventListener('DOMContentLoaded', function () {
             const btn = document.createElement('button');
             btn.className = 'btn btn-outline-light btn-sm';
             btn.textContent = route.title;
-            btn.onclick = () => {
-                startSimulatorFromCoords(route.lat, route.lng);
-            };
+            btn.onclick = () => { startSimulatorFromCoords(route.lat, route.lng); };
             suggestionsContainer.appendChild(btn);
         });
-    }
-
-    function startSimulatorFromCoords(lat, lng) {
-        const popup = L.popup().setLatLng([lat, lng]).setContent('正在為您載入路線...').openOn(map);
-        const url = `https://graph.mapillary.com/images?access_token=${MAPILLARY_SHORT_TOKEN}&fields=id&closeto=${lng},${lat}&radius=3000`;
-        
-        fetch(url).then(r => r.json()).then(d => {
-            if (d && d.data && d.data.length > 0) {
-                popup.remove();
-                startSimulator(d.data[0].id);
-            } else {
-                popup.setContent('此座標附近沒有可用的街景照片。');
-            }
-        }).catch(err => popup.setContent('載入路線時發生錯誤。'));
     }
 
     function startSimulator(startImageId) {
@@ -133,7 +124,7 @@ document.addEventListener('DOMContentLoaded', function () {
         suggestionsContainer.classList.add('d-none');
         simulatorContainer.classList.remove('d-none');
         
-        viewer = new mapillary.Viewer('mly-wrapper', MAPILLARY_FULL_TOKEN, { imageId: startImageId });
+        viewer = new mapillary.Viewer('mly-wrapper', MAPILLARY_FULL_TOKEN, { imageId: String(startImageId) }); // 確保 ID 是字串
         window.addEventListener('resize', () => viewer && viewer.resize());
 
         const startStopBtn = document.getElementById('startStopBtn');
