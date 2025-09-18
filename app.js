@@ -1,8 +1,20 @@
 document.addEventListener('DOMContentLoaded', function () {
     // ============================ 請在這裡設定您的 Token ============================
+
+    // Mapbox Token (從 mapbox.com 取得)
+    const MAPBOX_ACCESS_TOKEN = 'YOUR_MAPBOX_ACCESS_TOKEN'; // 請替換
+
+    // Mapillary Token (從 mapillary.com 取得)
     const MAPILLARY_FULL_TOKEN = 'MLY|25053230184274584|6f54c235cc9a903f16230177f9acc623';
     const MAPILLARY_SHORT_TOKEN = '6f54c235cc9a903f16230177f9acc623';
+
     // ==============================================================================
+
+    if (MAPBOX_ACCESS_TOKEN === 'YOUR_MAPBOX_ACCESS_TOKEN') {
+        alert('請在 app.js 中設定您的 Mapbox Access Token!');
+    }
+
+    mapboxgl.accessToken = MAPBOX_ACCESS_TOKEN;
 
     const curated_routes = [
         { title: '瑞士-貝爾尼納快車', lat: 46.40, lng: 10.02 },
@@ -15,19 +27,6 @@ document.addEventListener('DOMContentLoaded', function () {
         { title: '日本-伊呂波山道', lat: 36.74, lng: 139.49 },
         { title: '美國-加州一號公路', lat: 36.27, lng: -121.81 },
         { title: '加拿大-冰原大道', lat: 52.22, lng: -117.22 },
-        { title: '法國-伊塞蘭山口', lat: 45.41, lng: 7.03 },
-        { title: '荷蘭-鄉村小路', lat: 52.23, lng: 4.93 },
-        { title: '紐西蘭-米爾福德峽灣路', lat: -44.97, lng: 168.05 },
-        { title: '西班牙-安達盧西亞', lat: 36.76, lng: -5.16 },
-        { title: '美國-紀念碑谷', lat: 37.00, lng: -110.00 },
-        { title: '澳洲-大洋路', lat: -38.68, lng: 143.35 },
-        { title: '南非-查普曼峰', lat: -34.08, lng: 18.35 },
-        { title: '冰島-斯科加瀑布', lat: 63.53, lng: -19.51 },
-        { title: '葡萄牙-杜羅河谷', lat: 41.15, lng: -7.96 },
-        { title: '美國-夏威夷哈納之路', lat: 20.80, lng: -156.12 },
-        { title: '蘇格蘭-北海岸500', lat: 58.55, lng: -4.75 },
-        { title: '羅馬尼亞-Transfăgărășan', lat: 45.60, lng: 24.61 },
-        { title: '韓國-濟州島', lat: 33.25, lng: 126.30 },
     ];
 
     const mapContainer = document.getElementById('map');
@@ -40,46 +39,51 @@ document.addEventListener('DOMContentLoaded', function () {
     let isRiding = false;
 
     function startSimulatorFromCoords(lat, lng) {
-        const popup = L.popup().setLatLng([lat, lng]).setContent('正在為您載入路線...').openOn(map);
+        new mapboxgl.Popup()
+            .setLngLat([lng, lat])
+            .setHTML('正在為您載入路線...')
+            .addTo(map);
+
         const url = `https://graph.mapillary.com/images?access_token=${MAPILLARY_SHORT_TOKEN}&fields=id&closeto=${lng},${lat}&radius=3000`;
         fetch(url).then(r => r.json()).then(d => {
-            if (d && d.data && d.data.length > 0) { popup.remove(); startSimulator(d.data[0].id); }
-            else { popup.setContent('此座標附近沒有可用的街景照片。'); }
-        }).catch(err => popup.setContent('載入路線時發生錯誤。'));
+            if (d && d.data && d.data.length > 0) {
+                startSimulator(d.data[0].id);
+            } else {
+                alert('此座標附近沒有可用的街景照片。');
+            }
+        }).catch(err => alert('載入路線時發生錯誤。'));
     }
 
     function initMap() {
-        map = L.map('map', { zoomControl: false }).setView([23.9, 121.1], 5);
-        L.control.zoom({ position: 'topright' }).addTo(map);
+        map = new mapboxgl.Map({
+            container: 'map',
+            style: 'mapbox://styles/mapbox/dark-v11', // Mapbox 官方深色樣式
+            center: [121.1, 23.9], // lng, lat
+            zoom: 5
+        });
 
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
-            subdomains: 'abcd', maxZoom: 20
-        }).addTo(map);
+        map.addControl(new mapboxgl.NavigationControl(), 'top-right');
 
-        const mapillaryStyle = { version: 8, sources: { mapillary: { type: 'vector', tiles: [`https://tiles.mapillary.com/maps/vtp/mly1_public/2/{z}/{x}/{y}?access_token=${MAPILLARY_FULL_TOKEN}`] } },
-            layers: [
-                { id: 'mapillary-sequences', type: 'line', source: 'mapillary', 'source-layer': 'sequence', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#00ff00', 'line-width': 2 } },
-                { id: 'mapillary-images', type: 'circle', source: 'mapillary', 'source-layer': 'image', paint: { 'circle-color': '#00ff00', 'circle-radius': 1.5, 'circle-opacity': 0.6 } }
-            ]
-        };
-        const glLayer = L.mapboxGL({ style: mapillaryStyle }).addTo(map);
-        const mapboxMap = glLayer.getMapboxMap();
+        map.on('load', () => {
+            map.addSource('mapillary', {
+                type: 'vector',
+                tiles: [`https://tiles.mapillary.com/maps/vtp/mly1_public/2/{z}/{x}/{y}?access_token=${MAPILLARY_FULL_TOKEN}`],
+                minzoom: 6,
+                maxzoom: 14
+            });
 
-        // *** 修正渲染 Bug 的程式碼 v2 ***
-        map.on('zoom', () => { mapboxMap.resize(); });
-        map.on('move', () => { mapboxMap.resize(); });
+            map.addLayer({ id: 'mapillary-sequences', type: 'line', source: 'mapillary', 'source-layer': 'sequence', paint: { 'line-color': '#00ff00', 'line-width': 2, 'line-opacity': 0.7 } });
+            map.addLayer({ id: 'mapillary-images', type: 'circle', source: 'mapillary', 'source-layer': 'image', paint: { 'circle-color': '#00ff00', 'circle-radius': 1.5, 'circle-opacity': 0.6 } });
 
-        mapboxMap.on('load', () => {
             const layers = ['mapillary-sequences', 'mapillary-images'];
-            mapboxMap.on('mouseenter', layers, () => { mapboxMap.getCanvas().style.cursor = 'pointer'; });
-            mapboxMap.on('mouseleave', layers, () => { mapboxMap.getCanvas().style.cursor = ''; });
+            map.on('mouseenter', layers, () => { map.getCanvas().style.cursor = 'pointer'; });
+            map.on('mouseleave', layers, () => { map.getCanvas().style.cursor = ''; });
 
-            mapboxMap.on('click', 'mapillary-images', (e) => {
+            map.on('click', 'mapillary-images', (e) => {
                 if (e.features.length > 0) startSimulator(e.features[0].properties.id);
             });
 
-            mapboxMap.on('click', 'mapillary-sequences', (e) => {
+            map.on('click', 'mapillary-sequences', (e) => {
                 if (e.features.length > 0) {
                     const sequenceId = e.features[0].properties.id;
                     const url = `https://graph.mapillary.com/${sequenceId}/images?access_token=${MAPILLARY_SHORT_TOKEN}&fields=id`;
@@ -104,13 +108,7 @@ document.addEventListener('DOMContentLoaded', function () {
         };
         suggestionsContainer.appendChild(randomBtn);
 
-        const shuffle = (array) => {
-            let currentIndex = array.length, randomIndex;
-            while (currentIndex != 0) { randomIndex = Math.floor(Math.random() * currentIndex); currentIndex--; [array[currentIndex], array[randomIndex]] = [array[randomIndex], array[currentIndex]]; }
-            return array;
-        }
-        const randomRoutes = shuffle(curated_routes).slice(0, 10);
-        randomRoutes.forEach(route => {
+        curated_routes.slice(0, 10).forEach(route => {
             const btn = document.createElement('button');
             btn.className = 'btn btn-outline-light btn-sm';
             btn.textContent = route.title;
@@ -140,12 +138,15 @@ document.addEventListener('DOMContentLoaded', function () {
         const onSpeedChange = () => { speedValue.textContent = speedSettings[speedRange.value].text; if (isRiding) { stopRide(); startRide(); } };
         const onBack = () => {
             if (isRiding) stopRide();
-            viewer.remove(); viewer = null;
+            if (viewer) viewer.remove();
+            viewer = null;
             simulatorContainer.classList.add('d-none');
             mapContainer.classList.remove('d-none');
             suggestionsContainer.classList.remove('d-none');
-            setTimeout(() => map.invalidateSize(), 10);
-            startStopBtn.removeEventListener('click', onStartStop); speedRange.removeEventListener('input', onSpeedChange); backBtn.removeEventListener('click', onBack);
+            if (map) map.resize();
+            startStopBtn.removeEventListener('click', onStartStop);
+            speedRange.removeEventListener('input', onSpeedChange);
+            backBtn.removeEventListener('click', onBack);
         };
 
         startStopBtn.addEventListener('click', onStartStop);
