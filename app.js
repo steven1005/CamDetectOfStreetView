@@ -33,7 +33,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const mapContainer = document.getElementById('map');
     const simulatorContainer = document.getElementById('simulator');
     const suggestionsContainer = document.getElementById('route-suggestions');
-    
+
     let map = null;
     let viewer = null;
     let rideInterval = null;
@@ -57,7 +57,8 @@ document.addEventListener('DOMContentLoaded', function () {
             subdomains: 'abcd', maxZoom: 20
         }).addTo(map);
 
-        const mapillaryStyle = { version: 8, sources: { mapillary: { type: 'vector', tiles: [`https://tiles.mapillary.com/maps/vtp/mly1_public/2/{z}/{x}/{y}?access_token=${MAPILLARY_FULL_TOKEN}`] } },
+        const mapillaryStyle = {
+            version: 8, sources: { mapillary: { type: 'vector', tiles: [`https://tiles.mapillary.com/maps/vtp/mly1_public/2/{z}/{x}/{y}?access_token=${MAPILLARY_FULL_TOKEN}`] } },
             layers: [
                 { id: 'mapillary-sequences', type: 'line', source: 'mapillary', 'source-layer': 'sequence', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#00ff00', 'line-width': 2 } },
                 { id: 'mapillary-images', type: 'circle', source: 'mapillary', 'source-layer': 'image', paint: { 'circle-color': '#00ff00', 'circle-radius': 1.5, 'circle-opacity': 0.6 } }
@@ -106,7 +107,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         const shuffle = (array) => {
             let currentIndex = array.length, randomIndex;
-            while (currentIndex != 0) { randomIndex = Math.floor(Math.random() * currentIndex); currentIndex--; [array[currentIndex], array[randomIndex]] = [array[randomIndex], array[currentIndex]]; }
+            while (currentIndex != 0) { randomIndex = Math.floor(Math.random() * currentIndex); currentIndex--;[array[currentIndex], array[randomIndex]] = [array[randomIndex], array[currentIndex]]; }
             return array;
         }
         const randomRoutes = shuffle(curated_routes).slice(0, 10);
@@ -123,7 +124,7 @@ document.addEventListener('DOMContentLoaded', function () {
         mapContainer.classList.add('d-none');
         suggestionsContainer.classList.add('d-none');
         simulatorContainer.classList.remove('d-none');
-        
+
         viewer = new mapillary.Viewer('mly-wrapper', MAPILLARY_FULL_TOKEN, { imageId: String(startImageId) }); // 確保 ID 是字串
         window.addEventListener('resize', () => viewer && viewer.resize());
 
